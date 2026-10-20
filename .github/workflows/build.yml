@@ -1,0 +1,84 @@
+name: build
+on:
+  push:
+    branches: [main]
+    paths-ignore: [manifest.json]
+  schedule:
+    - cron: 0 4 * * *
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: build
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: enable multilib
+        run: |
+          python3 - <<'EOF'
+          conf = '/etc/pacman.conf'
+          lines = open(conf).read().splitlines()
+          out = []
+          inml = False
+          for l in lines:
+              st = l.strip()
+              if st == '[multilib]':
+                  inml = True
+              elif st.startswith('[') and st.endswith(']'):
+                  inml = False
+              if inml and st.startswith('#Include'):
+                  l = l.lstrip('#')
+              out.append(l)
+          open(conf, 'w').write('\n'.join(out) + '\n')
+          EOF
+          pacman -Syu --noconfirm git python
+      - name: check
+        id: plan
+        run: |
+          python3 tools/check.py > packages-to-build.txt
+          echo "count=$(grep -cv '^$' packages-to-build.txt || true)" >> "$GITHUB_OUTPUT"
+          echo "building:"; cat packages-to-build.txt
+      - name: build
+        if: steps.plan.outputs.count > 0
+        run: bash tools/build.sh "$(grep -v '^$' packages-to-build.txt)"
+      - name: publish repo branch
+        if: steps.plan.outputs.count > 0
+        run: |
+          [ -d out/x86_64 ] || exit 0
+          rm -rf /tmp/repo-branch
+          git init -q /tmp/repo-branch -b repo
+          cp -a out/x86_64 /tmp/repo-branch/x86_64
+          cd /tmp/repo-branch
+          git config user.name "lunchstorage-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add -A
+          git commit -qm "repo update"
+          git push -f "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:repo
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: release
+        if: steps.plan.outputs.count > 0
+        run: |
+          [ -d out/x86_64 ] || exit 0
+          pacman -S --noconfirm gh
+          export GH_TOKEN="${GITHUB_TOKEN}"
+          tar -C out -czf repo.tgz x86_64
+          gh release create repo --repo "${GITHUB_REPOSITORY}" --title "pacman repo" --notes "latest lunchstorage pacman repository snapshot" 2>/dev/null || true
+          gh release upload repo --repo "${GITHUB_REPOSITORY}" repo.tgz --clobber
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: commit manifest
+        run: |
+          git config user.name "lunchstorage-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add manifest.json
+          git diff --cached --quiet || git commit -qm "manifest: update versions"
+          git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

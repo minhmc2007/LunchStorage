@@ -1,0 +1,30 @@
+[submodule "pkgs/ncurses5-compat-libs"]
+	path = pkgs/ncurses5-compat-libs
+	url = https://aur.archlinux.org/ncurses5-compat-libs.git
+[submodule "pkgs/lib32-ncurses5-compat-libs"]
+	path = pkgs/lib32-ncurses5-compat-libs
+	url = https://aur.archlinux.org/lib32-ncurses5-compat-libs.git
+[submodule "pkgs/python2"]
+	path = pkgs/python2
+	url = https://aur.archlinux.org/python2.git
+[submodule "pkgs/ii-material-sddm-git"]
+	path = pkgs/ii-material-sddm-git
+	url = https://aur.archlinux.org/ii-material-sddm-git.git
+[submodule "pkgs/material-symbols-git"]
+	path = pkgs/material-symbols-git
+	url = https://aur.archlinux.org/material-symbols-git.git
+[submodule "pkgs/python-materialyoucolor"]
+	path = pkgs/python-materialyoucolor
+	url = https://aur.archlinux.org/python-materialyoucolor.git
+[submodule "pkgs/libastal-bluetooth-git"]
+	path = pkgs/libastal-bluetooth-git
+	url = https://aur.archlinux.org/libastal-bluetooth-git.git
+[submodule "pkgs/libastal-wireplumber-git"]
+	path = pkgs/libastal-wireplumber-git
+	url = https://aur.archlinux.org/libastal-wireplumber-git.git
+[submodule "pkgs/hypryou"]
+	path = pkgs/hypryou
+	url = https://aur.archlinux.org/hypryou.git
+[submodule "pkgs/hypryou-utils"]
+	path = pkgs/hypryou-utils
+	url = https://aur.archlinux.org/hypryou-utils.git
