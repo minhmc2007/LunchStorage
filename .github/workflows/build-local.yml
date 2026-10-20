@@ -27,12 +27,14 @@ jobs:
           if ! grep -qxF '[multilib]' /etc/pacman.conf; then
             printf '\n[multilib]\nInclude = /etc/pacman.d/mirrorlist\n' | sudo tee -a /etc/pacman.conf >/dev/null
           fi
-          sudo pacman -Syu --noconfirm --needed base-devel git python gh
+          missing=0
+          for c in git python3 gh gcc make fakeroot; do command -v "$c" >/dev/null || missing=1; done
+          [ "$missing" = 0 ] || sudo pacman -S --needed --noconfirm base-devel git python github-cli
           if gh release view repo --json assets --jq '.assets[].name' 2>/dev/null | grep -qx 'lunchstorage.db'; then
             if ! grep -qxF '[lunchstorage]' /etc/pacman.conf; then
               printf '\n[lunchstorage]\nSigLevel = Never\nServer = https://github.com/%s/releases/download/repo\n' "$GITHUB_REPOSITORY" | sudo tee -a /etc/pacman.conf >/dev/null
-              sudo pacman -Sy --noconfirm
             fi
+            [ -f /var/lib/pacman/sync/lunchstorage.db ] || sudo pacman -Sy --noconfirm
           fi
       - name: check
         id: plan
