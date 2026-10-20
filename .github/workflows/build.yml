@@ -16,6 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     container: archlinux:base-devel
     steps:
+      - name: bootstrap git
+        run: pacman -Sy --noconfirm git
       - uses: actions/checkout@v4
         with:
           submodules: recursive
