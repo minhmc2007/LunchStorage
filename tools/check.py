@@ -55,6 +55,32 @@ for rel, name in pkg_dirs():
         plan.append(name)
     manifest[name] = desired
 
+def topo(plan):
+    if not plan:
+        return []
+    info = aur_info(plan)
+    dmap = {}
+    for n in plan:
+        deps = []
+        for d in info.get(n, {}).get("Depends", []) + info.get(n, {}).get("MakeDepends", []):
+            dn = d.split(">")[0].split("<")[0].split("=")[0]
+            if dn in plan and dn != n:
+                deps.append(dn)
+        dmap[n] = deps
+    order, seen, vis = [], {}, set()
+    def visit(n):
+        if seen.get(n) or n in vis:
+            return
+        vis.add(n)
+        for d in dmap.get(n, ()):
+            visit(d)
+        vis.discard(n)
+        seen[n] = True
+        order.append(n)
+    for n in plan:
+        visit(n)
+    return order
+
 json.dump(manifest, open(manifest_path, "w"), indent=1)
-json.dump({"packages": plan}, open(os.path.join(ROOT, "plan.json"), "w"), indent=1)
-print("\n".join(plan))
+json.dump({"packages": topo(plan)}, open(os.path.join(ROOT, "plan.json"), "w"), indent=1)
+print("\n".join(topo(plan)))

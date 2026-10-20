@@ -7,6 +7,7 @@ PKGS="${1:-$(python3 -c 'import json;print("\n".join(json.load(open("plan.json")
 mkdir -p "$OUT"
 useradd -m build 2>/dev/null || true
 echo "build ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/10-build && chmod 440 /etc/sudoers.d/10-build
+chown -R build:build pkgs calamares 2>/dev/null || true
 for pkg in $PKGS; do
   dir=pkgs/$pkg
   [ "$pkg" = calamares ] && dir=calamares
