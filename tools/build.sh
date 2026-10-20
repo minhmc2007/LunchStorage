@@ -61,7 +61,7 @@ for pkg in $PKGS; do
     continue
   fi
   echo "== building $pkg"
-  (cd "$build_dir" && runuser -u build -- env HOME=/home/build makepkg -C -f -s --skippgpcheck --nocheck --noconfirm --needed)
+  (cd "$build_dir" && runuser -u build -- env HOME=/home/build MAKEFLAGS="-j$(nproc)" makepkg -C -f -s --skippgpcheck --nocheck --noconfirm --needed)
   mapfile -t listed < <(cd "$build_dir" && runuser -u build -- env HOME=/home/build makepkg --packagelist 2>/dev/null)
   built=()
   for f in "${listed[@]}"; do [ -f "$f" ] && built+=("$f"); done
