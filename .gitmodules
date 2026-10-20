@@ -28,3 +28,6 @@
 [submodule "pkgs/hypryou-utils"]
 	path = pkgs/hypryou-utils
 	url = https://aur.archlinux.org/hypryou-utils.git
+[submodule "pkgs/openssl-1.1"]
+	path = pkgs/openssl-1.1
+	url = https://aur.archlinux.org/openssl-1.1.git

@@ -21,7 +21,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-      - name: enable multilib
+      - name: enable multilib + lunchstorage repo
         run: |
           python3 - <<'EOF'
           conf = '/etc/pacman.conf'
@@ -39,6 +39,9 @@ jobs:
               out.append(l)
           open(conf, 'w').write('\n'.join(out) + '\n')
           EOF
+          if git ls-remote --exit-code origin repo >/dev/null 2>&1; then
+            printf '\n[lunchstorage]\nSigLevel = Never\nServer = https://raw.githubusercontent.com/%s/repo/x86_64\n' "$GITHUB_REPOSITORY" >> /etc/pacman.conf
+          fi
           pacman -Syu --noconfirm git python
       - name: check
         id: plan
@@ -46,6 +49,12 @@ jobs:
           python3 tools/check.py > packages-to-build.txt
           echo "count=$(grep -cv '^$' packages-to-build.txt || true)" >> "$GITHUB_OUTPUT"
           echo "building:"; cat packages-to-build.txt
+      - name: prepare repo
+        if: steps.plan.outputs.count > 0
+        run: |
+          mkdir -p out
+          git fetch --depth=1 origin repo 2>/dev/null || true
+          git archive origin/repo x86_64 2>/dev/null | tar -x -C out || true
       - name: build
         if: steps.plan.outputs.count > 0
         run: bash tools/build.sh "$(grep -v '^$' packages-to-build.txt)"
