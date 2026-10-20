@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
-# compares AUR state against manifest.json, emits plan.json and updated manifest.json
-import json, os, subprocess, urllib.request
+# compares upstream state against manifest.json, emits plan.json + updated manifest.json
+import json, os, subprocess, sys, urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-def aur_info(bases):
-    q = "&".join("arg[]=" + b for b in bases)
-    res = json.load(urllib.request.urlopen("https://aur.archlinux.org/rpc/v5/info?" + q))["results"]
-    return {r["PackageBase"]: r["Version"] for r in res}
+def aur_records(names):
+    if not names:
+        return {}
+    q = "&".join("arg[]=" + n for n in names)
+    url = "https://aur.archlinux.org/rpc/v5/info?" + q
+    res = json.load(urllib.request.urlopen(url))["results"]
+    return {r["Name"]: r for r in res}
 
 def aur_commit(base):
     out = subprocess.run(["git", "ls-remote", "https://aur.archlinux.org/%s.git" % base, "HEAD"],
@@ -23,51 +26,59 @@ def pkg_dirs():
 
 manifest_path = os.path.join(ROOT, "manifest.json")
 manifest = json.load(open(manifest_path)) if os.path.exists(manifest_path) else {}
+dirs = list(pkg_dirs())
+records = aur_records([name for _, name in dirs if not name.endswith("-git")])
+
 plan = []
-
-names, vcs = {}, []
-for rel, name in pkg_dirs():
-    if name.endswith("-git"):
-        vcs.append(name)
-    else:
-        names.setdefault(name, None)
-
-want = aur_info(names) if names else {}
-for rel, name in pkg_dirs():
+for rel, name in dirs:
     if name.endswith("-git"):
         desired = aur_commit(name)
-    elif name == "calamares":
+    elif name in records:
+        desired = records[name]["Version"]
+    else:
+        pkgver = pkgrel = None
         for line in open(os.path.join(ROOT, rel, "PKGBUILD")):
             if line.startswith("pkgrel="):
                 pkgrel = line.split("=", 1)[1].strip()
-                break
-            if line.startswith("pkgver="):
+            elif line.startswith("pkgver="):
                 pkgver = line.split("=", 1)[1].strip()
-        try: pkgver
-        except NameError: continue
-        desired = "%s-%s" % (pkgver, pkgrel)
-    else:
-        desired = want.get(name)
+        desired = "%s-%s" % (pkgver, pkgrel) if (pkgver and pkgrel) else None
     if desired is None:
-        print("# skip unknown %s" % name, file=__import__("sys").stderr)
+        print("# no state found for %s, skipping" % name, file=sys.stderr)
         continue
     if manifest.get(name) != desired:
         plan.append(name)
     manifest[name] = desired
 
-def topo(plan):
-    if not plan:
+def topo(p):
+    if not p:
         return []
-    info = aur_info(plan)
-    dmap = {}
-    for n in plan:
-        deps = []
-        for d in info.get(n, {}).get("Depends", []) + info.get(n, {}).get("MakeDepends", []):
+    raw, dep_names = {}, set()
+    for n in p:
+        r = records.get(n, {})
+        vals = []
+        for d in (r.get("Depends", []) or []) + (r.get("MakeDepends", []) or []):
             dn = d.split(">")[0].split("<")[0].split("=")[0]
-            if dn in plan and dn != n:
-                deps.append(dn)
-        dmap[n] = deps
+            vals.append(dn)
+            dep_names.add(dn)
+        raw[n] = vals
+    extra = aur_records([dn for dn in dep_names if dn not in p])
+
+    def base_of(dn):
+        if dn in p:
+            return dn
+        return extra.get(dn, {}).get("PackageBase")
+
+    dmap = {}
+    for n in p:
+        edges = set()
+        for dn in raw[n]:
+            b = base_of(dn)
+            if b and b in p and b != n:
+                edges.add(b)
+        dmap[n] = edges
     order, seen, vis = [], {}, set()
+
     def visit(n):
         if seen.get(n) or n in vis:
             return
@@ -77,10 +88,12 @@ def topo(plan):
         vis.discard(n)
         seen[n] = True
         order.append(n)
-    for n in plan:
+
+    for n in p:
         visit(n)
     return order
 
+order = topo(plan)
 json.dump(manifest, open(manifest_path, "w"), indent=1)
-json.dump({"packages": topo(plan)}, open(os.path.join(ROOT, "plan.json"), "w"), indent=1)
-print("\n".join(topo(plan)))
+json.dump({"packages": order}, open(os.path.join(ROOT, "plan.json"), "w"), indent=1)
+print("\n".join(order))
