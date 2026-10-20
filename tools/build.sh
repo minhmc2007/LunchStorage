@@ -10,6 +10,14 @@ echo "build ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/10-build && chmod 440 /etc
 for pkg in $PKGS; do
   dir=pkgs/$pkg
   [ "$pkg" = calamares ] && dir=calamares
+  skip=0
+  for p in "$dir"/*.pkg.tar.zst; do
+    [ -e "$p" ] || continue
+    case "$(basename "$p")" in *.sig) continue ;; esac
+    n="$(basename "$p" .pkg.tar.zst)"
+    if pacman -Qq "$n" >/dev/null 2>&1; then skip=1; break; fi
+  done
+  if [ "$skip" = 1 ]; then echo "== skip $pkg (already built + installed)"; continue; fi
   echo "== building $pkg"
   (cd "$dir" && runuser -u build -- env HOME=/home/build makepkg -C -f -s --skippgpcheck --noconfirm --needed)
   pacman -U --noconfirm "$dir"/*.pkg.tar.zst
