@@ -1,0 +1,67 @@
+name: build-local
+on:
+  push:
+    branches: [main]
+    paths-ignore: [manifest.json]
+  schedule:
+    - cron: 0 4 * * *
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: lunchstorage-build
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: [self-hosted, lunchbox]
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: setup
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          sudo -n true
+          if ! grep -qxF '[multilib]' /etc/pacman.conf; then
+            printf '\n[multilib]\nInclude = /etc/pacman.d/mirrorlist\n' | sudo tee -a /etc/pacman.conf >/dev/null
+          fi
+          sudo pacman -Syu --noconfirm --needed base-devel git python gh
+          if gh release view repo --json assets --jq '.assets[].name' 2>/dev/null | grep -qx 'lunchstorage.db'; then
+            if ! grep -qxF '[lunchstorage]' /etc/pacman.conf; then
+              printf '\n[lunchstorage]\nSigLevel = Never\nServer = https://github.com/%s/releases/download/repo\n' "$GITHUB_REPOSITORY" | sudo tee -a /etc/pacman.conf >/dev/null
+              sudo pacman -Sy --noconfirm
+            fi
+          fi
+      - name: check
+        id: plan
+        run: |
+          python3 tools/check.py > packages-to-build.txt
+          echo "count=$(grep -cv '^$' packages-to-build.txt || true)" >> "$GITHUB_OUTPUT"
+          echo "building:"; cat packages-to-build.txt
+      - name: fetch repo
+        if: steps.plan.outputs.count > 0
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash tools/fetch-repo.sh
+      - name: build
+        if: steps.plan.outputs.count > 0
+        run: sudo bash tools/build.sh "$(grep -v '^$' packages-to-build.txt)"
+      - name: fix ownership
+        if: always()
+        run: sudo chown -R "$(id -u):$(id -g)" . || true
+      - name: publish release
+        if: steps.plan.outputs.count > 0
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash tools/publish.sh
+      - name: commit manifest
+        run: |
+          git config user.name "lunchstorage-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add manifest.json
+          git diff --cached --quiet || git commit -qm "manifest: update versions"
+          git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

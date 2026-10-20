@@ -11,10 +11,14 @@ Pacman repo for LunchBox. PKGBUILDs pulled from AUR as git submodules (calamares
 
 ## How it works
 
-`tools/check.py` compares AUR state (RPC for versioned pkgs, `git ls-remote HEAD` for -git pkgs, PKGBUILD for calamares) against `manifest.json`. Changed or unbuilt packages go into the plan, `tools/build.sh` builds them, the result is pushed to the `repo` branch and attached to the `repo` release. Unchanged packages are skipped.
+`tools/check.py` compares AUR state (RPC for versioned pkgs, `git ls-remote HEAD` for -git pkgs, PKGBUILD for calamares) against `manifest.json`. Changed or unbuilt packages go into the plan, `tools/build.sh` builds them, `tools/publish.sh` uploads them to the `repo` GitHub Release. Unchanged packages are skipped.
+
+CI runs on the local Arch WSL runner (`.github/workflows/build-local.yml`). The GitHub-hosted `.github/workflows/build.yml` is a manual fallback. See `RUNNER.md`.
 
 Update a submodule: `git submodule update --remote <name>`
 
 ## Consuming
 
-Add `[lunchstorage]` with `Server = https://raw.githubusercontent.com/minhmc2007/LunchStorage/repo/x86_64`, unsigned. LunchBox bundles this at build time so installed systems stay offline-usable.
+Add `[lunchstorage]` with `Server = https://github.com/minhmc2007/LunchStorage/releases/download/repo`, unsigned. LunchBox bundles this at build time so installed systems stay offline-usable.
+
+`repo.tgz` on the release is a full snapshot used to restore the previous repo before an incremental build.
