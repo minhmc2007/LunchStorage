@@ -30,8 +30,9 @@ jobs:
           inml = False
           for l in lines:
               st = l.strip()
-              if st == '[multilib]':
+              if st in ('[multilib]', '#[multilib]'):
                   inml = True
+                  l = l.lstrip('#')
               elif st.startswith('[') and st.endswith(']'):
                   inml = False
               if inml and st.startswith('#Include'):
