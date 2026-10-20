@@ -9,9 +9,11 @@ mkdir -p "$OUT"
 useradd -m build 2>/dev/null || true
 echo "build ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/10-build && chmod 440 /etc/sudoers.d/10-build
 
+TEMP=0
 if (cd /tmp && runuser -u build -- test -x "$ROOT"); then
   BUILD_ROOT="$ROOT"
 else
+  TEMP=1
   BUILD_ROOT=$(mktemp -d /tmp/lunchstorage-build.XXXXXX)
   chmod 755 "$BUILD_ROOT"
   cp -a pkgs calamares "$BUILD_ROOT"/
@@ -55,7 +57,7 @@ for pkg in $PKGS; do
   if [ "$skip" = 1 ]; then
     echo "== skip $pkg (already built + installed)"
     cp "$build_dir"/*.pkg.tar.zst "$OUT/"
-    [ "$build_dir" = "$dir" ] || cp "$build_dir"/*.pkg.tar.zst "$dir/"
+    if [ "$TEMP" = 1 ]; then cp "$build_dir"/*.pkg.tar.zst "$dir/"; fi
     continue
   fi
   echo "== building $pkg"
@@ -69,7 +71,7 @@ for pkg in $PKGS; do
   fi
   install_pkgs "${built[@]}"
   cp "${built[@]}" "$OUT/"
-  [ "$build_dir" = "$dir" ] || cp "${built[@]}" "$dir/"
+  if [ "$TEMP" = 1 ]; then cp "${built[@]}" "$dir/"; fi
   for f in "$dir"/*.pkg.tar.zst; do
     [ -e "$f" ] || continue
     keep=0
