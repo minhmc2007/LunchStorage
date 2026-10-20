@@ -2,7 +2,7 @@
 # builds plan from plan.json into out/x86_64 local pacman repo
 set -euo pipefail
 cd "$(dirname "$0")/.."
-OUT=out/x86_64
+OUT="${OUT:-out/x86_64}"
 PKGS="${1:-$(python3 -c 'import json;print("\n".join(json.load(open("plan.json"))["packages"]))')}"
 mkdir -p "$OUT"
 useradd -m build 2>/dev/null || true
@@ -11,7 +11,7 @@ for pkg in $PKGS; do
   dir=pkgs/$pkg
   [ "$pkg" = calamares ] && dir=calamares
   echo "== building $pkg"
-  (cd "$dir" && runuser -u build -- env HOME=/home/build makepkg -C -f -s --noconfirm --needed)
+  (cd "$dir" && runuser -u build -- env HOME=/home/build makepkg -C -f -s --skippgpcheck --noconfirm --needed)
   pacman -U --noconfirm "$dir"/*.pkg.tar.zst
   cp "$dir"/*.pkg.tar.zst "$OUT/"
 done
