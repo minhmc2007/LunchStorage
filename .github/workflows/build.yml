@@ -23,23 +23,9 @@ jobs:
           submodules: recursive
       - name: enable multilib + lunchstorage repo
         run: |
-          python3 - <<'EOF'
-          conf = '/etc/pacman.conf'
-          lines = open(conf).read().splitlines()
-          out = []
-          inml = False
-          for l in lines:
-              st = l.strip()
-              if st in ('[multilib]', '#[multilib]'):
-                  inml = True
-                  l = l.lstrip('#')
-              elif st.startswith('[') and st.endswith(']'):
-                  inml = False
-              if inml and st.startswith('#Include'):
-                  l = l.lstrip('#')
-              out.append(l)
-          open(conf, 'w').write('\n'.join(out) + '\n')
-          EOF
+          if ! grep -qxF '[multilib]' /etc/pacman.conf; then
+            printf '\n[multilib]\nInclude = /etc/pacman.d/mirrorlist\n' >> /etc/pacman.conf
+          fi
           if git ls-remote --exit-code origin repo >/dev/null 2>&1; then
             printf '\n[lunchstorage]\nSigLevel = Never\nServer = https://raw.githubusercontent.com/%s/repo/x86_64\n' "$GITHUB_REPOSITORY" >> /etc/pacman.conf
           fi
